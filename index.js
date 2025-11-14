@@ -20,9 +20,13 @@ if (!API_KEY) {
 app.use(cors()); // Habilita o CORS para seu app Vue poder chamar
 app.use(express.json()); // Habilita o parse de body JSON
 
-// Rota "catch-all" do proxy
-// Vai capturar TUDO: /Servico/Pesquisar, /Lead/Criar, etc.
-app.all('*', async (req, res) => {
+// ===================================================
+// CORREÇÃO DEFINITIVA AQUI:
+// Trocamos 'app.all('*', ...)' por 'app.use(...)'
+// 'app.use' é a forma correta de capturar todas as
+// requisições como um middleware.
+// ===================================================
+app.use(async (req, res) => {
   const apiPath = req.path; // O caminho (ex: /Servico/Pesquisar)
   const targetUrl = `${BASE_URL}${apiPath}`;
 
