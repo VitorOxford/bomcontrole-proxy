@@ -1,60 +1,74 @@
-require('dotenv').config(); // Carrega o .env local
+require('dotenv').config(); 
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 
 const app = express();
 
-// Lê as variáveis de ambiente
 const API_KEY = process.env.BOMCONTROLE_API_KEY;
 const BASE_URL = 'https://apinewintegracao.bomcontrole.com.br/integracao';
-// O Render usa a variável PORT ou 10000
 const PORT = process.env.PORT || 10000;
 
 if (!API_KEY) {
   console.error('ERRO: BOMCONTROLE_API_KEY não está definida.');
-  process.exit(1); // Para o servidor se a key não for achada
+  process.exit(1); 
 }
 
-// Configurações do Servidor
-app.use(cors()); // Habilita o CORS para seu app Vue poder chamar
-app.use(express.json()); // Habilita o parse de body JSON
+app.use(cors()); 
+app.use(express.json()); 
 
-// ===================================================
-// CORREÇÃO DEFINITIVA AQUI:
-// Trocamos 'app.all('*', ...)' por 'app.use(...)'
-// 'app.use' é a forma correta de capturar todas as
-// requisições como um middleware.
-// ===================================================
+// Middleware "catch-all"
 app.use(async (req, res) => {
-  const apiPath = req.path; // O caminho (ex: /Servico/Pesquisar)
+  const apiPath = req.path;
   const targetUrl = `${BASE_URL}${apiPath}`;
 
   console.log(`[PROXY] Recebido: ${req.method} ${req.path}`);
+  
+  // ===================================================
+  // ## NOVA LÓGICA ##
+  // ===================================================
+  
+  // Clona os query params para poder modificá-los
+  const queryParams = { ...req.query };
+
+  // Se for a busca de produtos, injeta parâmetros de paginação
+  // para tentar buscar mais de 1 item.
+  if (req.method === 'GET' && apiPath === '/Servico/Pesquisar') {
+    if (!queryParams.pagina) {
+      queryParams.pagina = 1; // Pede a página 1
+    }
+    if (!queryParams.itensPorPagina) {
+      queryParams.itensPorPagina = 100; // Pede 100 itens
+    }
+    console.log(`[PROXY] Injetando paginação:`, queryParams);
+  }
+  // ===================================================
+
   console.log(`[PROXY] Redirecionando para: ${targetUrl}`);
 
   try {
-    // 1. Configura a chamada para o BomControle
     const config = {
       method: req.method,
       url: targetUrl,
-      params: req.query, // Repassa query params (para GET)
-      data: req.body,   // Repassa o body (para POST/PUT)
+      params: queryParams, // Usa os params modificados
+      data: req.body,   
       headers: {
-        // 2. INJETA A API KEY (Segura no servidor)
         'Authorization': `ApiKey ${API_KEY}`,
         'Content-Type': 'application/json',
       }
     };
 
-    // 3. Faz a chamada real para a API
     const apiResponse = await axios(config);
 
-    // 4. Retorna a resposta da API para o seu App Vue
+    // ===================================================
+    // ## NOVO LOG ## - É ISSO QUE PRECISAMOS VER
+    // ===================================================
+    console.log(`[PROXY] Resposta da API (${apiPath}):`, JSON.stringify(apiResponse.data, null, 2));
+    // ===================================================
+
     res.status(apiResponse.status).send(apiResponse.data);
 
   } catch (error) {
-    // 5. Em caso de erro, retorna o erro
     console.error('[PROXY] Erro ao chamar API:', error.response ? error.response.data : error.message);
     const status = error.response ? error.response.status : 500;
     const data = error.response ? error.response.data : { message: error.message };
@@ -62,7 +76,6 @@ app.use(async (req, res) => {
   }
 });
 
-// Inicia o servidor
 app.listen(PORT, () => {
   console.log(`Proxy BomControle rodando na porta ${PORT}`);
 });
