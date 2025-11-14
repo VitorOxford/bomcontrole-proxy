@@ -17,40 +17,19 @@ if (!API_KEY) {
 app.use(cors()); 
 app.use(express.json()); 
 
-// Middleware "catch-all"
+// Middleware "catch-all" (simples)
 app.use(async (req, res) => {
   const apiPath = req.path;
   const targetUrl = `${BASE_URL}${apiPath}`;
 
   console.log(`[PROXY] Recebido: ${req.method} ${req.path}`);
-  
-  // ===================================================
-  // ## NOVA LÓGICA ##
-  // ===================================================
-  
-  // Clona os query params para poder modificá-los
-  const queryParams = { ...req.query };
-
-  // Se for a busca de produtos, injeta parâmetros de paginação
-  // para tentar buscar mais de 1 item.
-  if (req.method === 'GET' && apiPath === '/Servico/Pesquisar') {
-    if (!queryParams.pagina) {
-      queryParams.pagina = 1; // Pede a página 1
-    }
-    if (!queryParams.itensPorPagina) {
-      queryParams.itensPorPagina = 100; // Pede 100 itens
-    }
-    console.log(`[PROXY] Injetando paginação:`, queryParams);
-  }
-  // ===================================================
-
   console.log(`[PROXY] Redirecionando para: ${targetUrl}`);
 
   try {
     const config = {
       method: req.method,
       url: targetUrl,
-      params: queryParams, // Usa os params modificados
+      params: req.query, // Repassa os params que o app Vue enviar
       data: req.body,   
       headers: {
         'Authorization': `ApiKey ${API_KEY}`,
@@ -59,12 +38,9 @@ app.use(async (req, res) => {
     };
 
     const apiResponse = await axios(config);
-
-    // ===================================================
-    // ## NOVO LOG ## - É ISSO QUE PRECISAMOS VER
-    // ===================================================
+    
+    // Log da resposta (para debug futuro)
     console.log(`[PROXY] Resposta da API (${apiPath}):`, JSON.stringify(apiResponse.data, null, 2));
-    // ===================================================
 
     res.status(apiResponse.status).send(apiResponse.data);
 
