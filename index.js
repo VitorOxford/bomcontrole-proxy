@@ -22,7 +22,7 @@ app.use(express.json()); // Habilita o parse de body JSON
 
 // Rota "catch-all" do proxy
 // Vai capturar TUDO: /Servico/Pesquisar, /Lead/Criar, etc.
-app.all('/*', async (req, res) => {
+app.all('*', async (req, res) => {
   const apiPath = req.path; // O caminho (ex: /Servico/Pesquisar)
   const targetUrl = `${BASE_URL}${apiPath}`;
 
